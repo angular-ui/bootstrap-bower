@@ -4,5 +4,10 @@
     },
     "name": "angular-bootstrap",
     "version": "0.3.0",
-    "main": ["./ui-bootstrap-tpls.js"]
+    "main": ["./ui-bootstrap-tpls.js"],
+    "dependencies": {
+        "bootstrap": ">=2",
+        "angular": ">=1"
+    }
+    
 }
