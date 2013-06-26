@@ -6,7 +6,6 @@
     "version": "0.4.0",
     "main": ["./ui-bootstrap-tpls.js"],
     "dependencies": {
-        "bootstrap": ">=2",
         "angular": ">=1"
     }    
 }
