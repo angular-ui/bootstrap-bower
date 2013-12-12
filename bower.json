@@ -3,8 +3,11 @@
         "name": "https://github.com/angular-ui/bootstrap/graphs/contributors"
     },
     "name": "angular-bootstrap",
-    "version": "0.7.0",
-    "main": ["./ui-bootstrap-tpls.js"],
+    "version": "0.8.0",
+    "main": [
+      "./bootstrap.css",
+      "./ui-bootstrap-tpls.js"
+    ],
     "dependencies": {
         "angular": ">=1"
     }    
