@@ -2,7 +2,7 @@
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 0.11.1 - 2014-09-26
+ * Version: 0.11.2 - 2014-09-26
  * License: MIT
  */
 angular.module("ui.bootstrap", ["ui.bootstrap.transition","ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.bindHtml","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.dropdown","ui.bootstrap.modal","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
@@ -1731,6 +1731,7 @@ angular.module('ui.bootstrap.dropdown', [])
 
 .directive('dropdown', function() {
   return {
+    restrict: 'CA',
     controller: 'DropdownController',
     link: function(scope, element, attrs, dropdownCtrl) {
       dropdownCtrl.init( element );
@@ -1740,6 +1741,7 @@ angular.module('ui.bootstrap.dropdown', [])
 
 .directive('dropdownToggle', function() {
   return {
+    restrict: 'CA',
     require: '?^dropdown',
     link: function(scope, element, attrs, dropdownCtrl) {
       if ( !dropdownCtrl ) {
