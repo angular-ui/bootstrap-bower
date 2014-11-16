@@ -8,6 +8,8 @@
         "angular-ui",
         "bootstrap"
     ],
+    "license": "MIT",
+    "ignore": [],
     "description": "Native AngularJS (Angular) directives for Bootstrap.",
     "version": "0.12.0",
     "main": ["./ui-bootstrap-tpls.js"],
