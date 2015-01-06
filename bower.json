@@ -2,7 +2,7 @@
     "author": {
         "name": "https://github.com/angular-ui/bootstrap/graphs/contributors"
     },
-    "name": "angular-bootstrap",
+    "name": "angular-bootstrap-tfe",
     "keywords": [
         "angular",
         "angular-ui",
@@ -11,9 +11,9 @@
     "license": "MIT",
     "ignore": [],
     "description": "Native AngularJS (Angular) directives for Bootstrap.",
-    "version": "0.12.0",
+    "version": "0.12.1",
     "main": ["./ui-bootstrap-tpls.js"],
     "dependencies": {
-        "angular": ">=1 <1.3.0"
+        "angular": ">=1.0.8"
     }    
 }
