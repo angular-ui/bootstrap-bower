@@ -1520,7 +1520,7 @@ function ($compile, $parse, $document, $position, dateFilter, dateParser, datepi
 
       if ( attrs.datepickerOptions ) {
         var options = scope.$parent.$eval(attrs.datepickerOptions);
-        if(options.initDate) {
+        if( typeof options != 'undefined' && options.initDate ) {
           scope.initDate = options.initDate;
           datepickerEl.attr( 'init-date', 'initDate' );
           delete options.initDate;
