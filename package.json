@@ -1,6 +1,6 @@
 {
   "name": "angular-bootstrap",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "description": "Bootstrap widgets for Angular",
   "main": "ui-bootstrap-tpls.js",
   "homepage": "http://angular-ui.github.io/bootstrap/",
