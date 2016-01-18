@@ -1,45 +1,60 @@
 /*
-* angular-ui-bootstrap
-* http://angular-ui.github.io/bootstrap/
+ * angular-ui-bootstrap
+ * http://angular-ui.github.io/bootstrap/
 
-* Version: 1.0.3 - 2016-01-11
-* License: MIT
-*/angular.module("ui.bootstrap", ["ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
+ * Version: 1.1.0 - 2016-01-18
+ * License: MIT
+ */angular.module("ui.bootstrap", ["ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
 angular.module('ui.bootstrap.collapse', [])
 
-  .directive('uibCollapse', ['$animate', '$injector', function($animate, $injector) {
+  .directive('uibCollapse', ['$animate', '$q', '$parse', '$injector', function($animate, $q, $parse, $injector) {
     var $animateCss = $injector.has('$animateCss') ? $injector.get('$animateCss') : null;
     return {
       link: function(scope, element, attrs) {
+        var expandingExpr = $parse(attrs.expanding),
+            expandedExpr = $parse(attrs.expanded),
+            collapsingExpr = $parse(attrs.collapsing),
+            collapsedExpr = $parse(attrs.collapsed);
+
         if (!scope.$eval(attrs.uibCollapse)) {
           element.addClass('in')
             .addClass('collapse')
+            .attr('aria-expanded', true)
+            .attr('aria-hidden', false)
             .css({height: 'auto'});
         }
 
         function expand() {
-          element.removeClass('collapse')
-            .addClass('collapsing')
-            .attr('aria-expanded', true)
-            .attr('aria-hidden', false);
-
-          if ($animateCss) {
-            $animateCss(element, {
-              addClass: 'in',
-              easing: 'ease',
-              to: { height: element[0].scrollHeight + 'px' }
-            }).start()['finally'](expandDone);
-          } else {
-            $animate.addClass(element, 'in', {
-              to: { height: element[0].scrollHeight + 'px' }
-            }).then(expandDone);
+          if (element.hasClass('collapse') && element.hasClass('in')) {
+            return;
           }
+
+          $q.resolve(expandingExpr(scope))
+            .then(function() {
+              element.removeClass('collapse')
+                .addClass('collapsing')
+                .attr('aria-expanded', true)
+                .attr('aria-hidden', false);
+
+              if ($animateCss) {
+                $animateCss(element, {
+                  addClass: 'in',
+                  easing: 'ease',
+                  to: { height: element[0].scrollHeight + 'px' }
+                }).start()['finally'](expandDone);
+              } else {
+                $animate.addClass(element, 'in', {
+                  to: { height: element[0].scrollHeight + 'px' }
+                }).then(expandDone);
+              }
+            });
         }
 
         function expandDone() {
           element.removeClass('collapsing')
             .addClass('collapse')
             .css({height: 'auto'});
+          expandedExpr(scope);
         }
 
         function collapse() {
@@ -47,34 +62,38 @@ angular.module('ui.bootstrap.collapse', [])
             return collapseDone();
           }
 
-          element
-            // IMPORTANT: The height must be set before adding "collapsing" class.
-            // Otherwise, the browser attempts to animate from height 0 (in
-            // collapsing class) to the given height here.
-            .css({height: element[0].scrollHeight + 'px'})
-            // initially all panel collapse have the collapse class, this removal
-            // prevents the animation from jumping to collapsed state
-            .removeClass('collapse')
-            .addClass('collapsing')
-            .attr('aria-expanded', false)
-            .attr('aria-hidden', true);
+          $q.resolve(collapsingExpr(scope))
+            .then(function() {
+              element
+                // IMPORTANT: The height must be set before adding "collapsing" class.
+                // Otherwise, the browser attempts to animate from height 0 (in
+                // collapsing class) to the given height here.
+                .css({height: element[0].scrollHeight + 'px'})
+                // initially all panel collapse have the collapse class, this removal
+                // prevents the animation from jumping to collapsed state
+                .removeClass('collapse')
+                .addClass('collapsing')
+                .attr('aria-expanded', false)
+                .attr('aria-hidden', true);
 
-          if ($animateCss) {
-            $animateCss(element, {
-              removeClass: 'in',
-              to: {height: '0'}
-            }).start()['finally'](collapseDone);
-          } else {
-            $animate.removeClass(element, 'in', {
-              to: {height: '0'}
-            }).then(collapseDone);
-          }
+              if ($animateCss) {
+                $animateCss(element, {
+                  removeClass: 'in',
+                  to: {height: '0'}
+                }).start()['finally'](collapseDone);
+              } else {
+                $animate.removeClass(element, 'in', {
+                  to: {height: '0'}
+                }).then(collapseDone);
+              }
+            });
         }
 
         function collapseDone() {
           element.css({height: '0'}); // Required so that collapse works when animation is disabled
           element.removeClass('collapsing')
             .addClass('collapse');
+          collapsedExpr(scope);
         }
 
         scope.$watch(attrs.uibCollapse, function(shouldCollapse) {
@@ -1600,16 +1619,12 @@ angular.module('ui.bootstrap.position', [])
       positionArrow: function(elem, placement) {
         elem = this.getRawNode(elem);
 
-        var isTooltip = true;
-
-        var innerElem = elem.querySelector('.tooltip-inner');
-        if (!innerElem) {
-          isTooltip = false;
-          innerElem = elem.querySelector('.popover-inner');
-        }
+        var innerElem = elem.querySelector('.tooltip-inner, .popover-inner');
         if (!innerElem) {
           return;
         }
+
+        var isTooltip = angular.element(innerElem).hasClass('tooltip-inner');
 
         var arrowElem = isTooltip ? elem.querySelector('.tooltip-arrow') : elem.querySelector('.arrow');
         if (!arrowElem) {
@@ -1670,30 +1685,30 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
 .value('$datepickerSuppressError', false)
 
 .constant('uibDatepickerConfig', {
+  datepickerMode: 'day',
   formatDay: 'dd',
   formatMonth: 'MMMM',
   formatYear: 'yyyy',
   formatDayHeader: 'EEE',
   formatDayTitle: 'MMMM yyyy',
   formatMonthTitle: 'yyyy',
-  datepickerMode: 'day',
-  minMode: 'day',
-  maxMode: 'year',
-  showWeeks: true,
-  startingDay: 0,
-  yearRows: 4,
-  yearColumns: 5,
-  minDate: null,
   maxDate: null,
+  maxMode: 'year',
+  minDate: null,
+  minMode: 'day',
+  ngModelOptions: {},
   shortcutPropagation: false,
-  ngModelOptions: {}
+  showWeeks: true,
+  yearColumns: 5,
+  yearRows: 4
 })
 
-.controller('UibDatepickerController', ['$scope', '$attrs', '$parse', '$interpolate', '$log', 'dateFilter', 'uibDatepickerConfig', '$datepickerSuppressError', 'uibDateParser',
-  function($scope, $attrs, $parse, $interpolate, $log, dateFilter, datepickerConfig, $datepickerSuppressError, dateParser) {
+.controller('UibDatepickerController', ['$scope', '$attrs', '$parse', '$interpolate', '$locale', '$log', 'dateFilter', 'uibDatepickerConfig', '$datepickerSuppressError', 'uibDateParser',
+  function($scope, $attrs, $parse, $interpolate, $locale, $log, dateFilter, datepickerConfig, $datepickerSuppressError, dateParser) {
   var self = this,
       ngModelCtrl = { $setViewValue: angular.noop }, // nullModelCtrl;
-      ngModelOptions = {};
+      ngModelOptions = {},
+      watchListeners = [];
 
   // Modes chain
   this.modes = ['day', 'month', 'year'];
@@ -1704,17 +1719,26 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   });
 
   // Evaled configuration attributes
-  angular.forEach(['showWeeks', 'startingDay', 'yearRows', 'yearColumns', 'shortcutPropagation'], function(key) {
-    self[key] = angular.isDefined($attrs[key]) ? $scope.$parent.$eval($attrs[key]) : datepickerConfig[key];
+  angular.forEach(['showWeeks', 'yearRows', 'yearColumns', 'shortcutPropagation'], function(key) {
+    self[key] = angular.isDefined($attrs[key]) ?
+      $scope.$parent.$eval($attrs[key]) : datepickerConfig[key];
   });
+
+  if (angular.isDefined($attrs.startingDay)) {
+    self.startingDay = $scope.$parent.$eval($attrs.startingDay);
+  } else if (angular.isNumber(datepickerConfig.startingDay)) {
+    self.startingDay = datepickerConfig.startingDay;
+  } else {
+    self.startingDay = ($locale.DATETIME_FORMATS.FIRSTDAYOFWEEK + 8) % 7;
+  }
 
   // Watchable date attributes
   angular.forEach(['minDate', 'maxDate'], function(key) {
     if ($attrs[key]) {
-      $scope.$parent.$watch($attrs[key], function(value) {
+      watchListeners.push($scope.$parent.$watch($attrs[key], function(value) {
         self[key] = value ? angular.isDate(value) ? dateParser.fromTimezone(new Date(value), ngModelOptions.timezone) : new Date(dateFilter(value, 'medium')) : null;
         self.refreshView();
-      });
+      }));
     } else {
       self[key] = datepickerConfig[key] ? dateParser.fromTimezone(new Date(datepickerConfig[key]), ngModelOptions.timezone) : null;
     }
@@ -1722,13 +1746,13 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
 
   angular.forEach(['minMode', 'maxMode'], function(key) {
     if ($attrs[key]) {
-      $scope.$parent.$watch($attrs[key], function(value) {
+      watchListeners.push($scope.$parent.$watch($attrs[key], function(value) {
         self[key] = $scope[key] = angular.isDefined(value) ? value : $attrs[key];
         if (key === 'minMode' && self.modes.indexOf($scope.datepickerMode) < self.modes.indexOf(self[key]) ||
           key === 'maxMode' && self.modes.indexOf($scope.datepickerMode) > self.modes.indexOf(self[key])) {
           $scope.datepickerMode = self[key];
         }
-      });
+      }));
     } else {
       self[key] = $scope[key] = datepickerConfig[key] || null;
     }
@@ -1739,22 +1763,22 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
 
   if (angular.isDefined($attrs.initDate)) {
     this.activeDate = dateParser.fromTimezone($scope.$parent.$eval($attrs.initDate), ngModelOptions.timezone) || new Date();
-    $scope.$parent.$watch($attrs.initDate, function(initDate) {
+    watchListeners.push($scope.$parent.$watch($attrs.initDate, function(initDate) {
       if (initDate && (ngModelCtrl.$isEmpty(ngModelCtrl.$modelValue) || ngModelCtrl.$invalid)) {
         self.activeDate = dateParser.fromTimezone(initDate, ngModelOptions.timezone);
         self.refreshView();
       }
-    });
+    }));
   } else {
     this.activeDate = new Date();
   }
 
   $scope.disabled = angular.isDefined($attrs.disabled) || false;
   if (angular.isDefined($attrs.ngDisabled)) {
-    $scope.$parent.$watch($attrs.ngDisabled, function(disabled) {
+    watchListeners.push($scope.$parent.$watch($attrs.ngDisabled, function(disabled) {
       $scope.disabled = disabled;
       self.refreshView();
-    });
+    }));
   }
 
   $scope.isActive = function(dateObject) {
@@ -1915,6 +1939,13 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
       self.refreshView();
     }
   };
+
+  $scope.$on("$destroy", function() {
+    //Clear all watch listeners on destroy
+    while (watchListeners.length) {
+      watchListeners.shift()();
+    }
+  });
 }])
 
 .controller('UibDaypickerController', ['$scope', '$element', 'dateFilter', function(scope, $element, dateFilter) {
@@ -2220,6 +2251,12 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
 })
 
 .constant('uibDatepickerPopupConfig', {
+  altInputFormats: [],
+  appendToBody: false,
+  clearText: 'Clear',
+  closeOnDateSelection: true,
+  closeText: 'Done',
+  currentText: 'Today',
   datepickerPopup: 'yyyy-MM-dd',
   datepickerPopupTemplateUrl: 'uib/template/datepicker/popup.html',
   datepickerTemplateUrl: 'uib/template/datepicker/datepicker.html',
@@ -2228,24 +2265,17 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
     'datetime-local': 'yyyy-MM-ddTHH:mm:ss.sss',
     'month': 'yyyy-MM'
   },
-  currentText: 'Today',
-  clearText: 'Clear',
-  closeText: 'Done',
-  closeOnDateSelection: true,
-  appendToBody: false,
-  showButtonBar: true,
   onOpenFocus: true,
-  altInputFormats: []
+  showButtonBar: true
 })
 
 .controller('UibDatepickerPopupController', ['$scope', '$element', '$attrs', '$compile', '$parse', '$document', '$rootScope', '$uibPosition', 'dateFilter', 'uibDateParser', 'uibDatepickerPopupConfig', '$timeout', 'uibDatepickerConfig',
 function(scope, element, attrs, $compile, $parse, $document, $rootScope, $position, dateFilter, dateParser, datepickerPopupConfig, $timeout, datepickerConfig) {
-  var self = this;
   var cache = {},
     isHtml5DateInput = false;
   var dateFormat, closeOnDateSelection, appendToBody, onOpenFocus,
     datepickerPopupTemplateUrl, datepickerTemplateUrl, popupEl, datepickerEl,
-    ngModel, ngModelOptions, $popup, altInputFormats;
+    ngModel, ngModelOptions, $popup, altInputFormats, watchListeners = [];
 
   scope.watchData = {};
 
@@ -2267,17 +2297,17 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
     } else {
       dateFormat = attrs.uibDatepickerPopup || datepickerPopupConfig.datepickerPopup;
       attrs.$observe('uibDatepickerPopup', function(value, oldValue) {
-          var newDateFormat = value || datepickerPopupConfig.datepickerPopup;
-          // Invalidate the $modelValue to ensure that formatters re-run
-          // FIXME: Refactor when PR is merged: https://github.com/angular/angular.js/pull/10764
-          if (newDateFormat !== dateFormat) {
-            dateFormat = newDateFormat;
-            ngModel.$modelValue = null;
+        var newDateFormat = value || datepickerPopupConfig.datepickerPopup;
+        // Invalidate the $modelValue to ensure that formatters re-run
+        // FIXME: Refactor when PR is merged: https://github.com/angular/angular.js/pull/10764
+        if (newDateFormat !== dateFormat) {
+          dateFormat = newDateFormat;
+          ngModel.$modelValue = null;
 
-            if (!dateFormat) {
-              throw new Error('uibDatepickerPopup must have a date format specified.');
-            }
+          if (!dateFormat) {
+            throw new Error('uibDatepickerPopup must have a date format specified.');
           }
+        }
       });
     }
 
@@ -2323,16 +2353,7 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
       });
     }
 
-    angular.forEach(['minMode', 'maxMode'], function(key) {
-      if (attrs[key]) {
-        scope.$parent.$watch(function() { return attrs[key]; }, function(value) {
-          scope.watchData[key] = value;
-        });
-        datepickerEl.attr(cameltoDash(key), 'watchData.' + key);
-      }
-    });
-
-    angular.forEach(['datepickerMode', 'shortcutPropagation'], function(key) {
+    angular.forEach(['minMode', 'maxMode', 'datepickerMode', 'shortcutPropagation'], function(key) {
       if (attrs[key]) {
         var getAttribute = $parse(attrs[key]);
         var propConfig = {
@@ -2359,13 +2380,21 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
       if (attrs[key]) {
         var getAttribute = $parse(attrs[key]);
 
-        scope.$parent.$watch(getAttribute, function(value) {
+        watchListeners.push(scope.$parent.$watch(getAttribute, function(value) {
           if (key === 'minDate' || key === 'maxDate') {
-            cache[key] = angular.isDate(value) ? dateParser.fromTimezone(new Date(value), ngModelOptions.timezone) : new Date(dateFilter(value, 'medium'));
-          }
+            if (value === null) {
+              cache[key] = null;
+            } else if (angular.isDate(value)) {
+              cache[key] = dateParser.fromTimezone(new Date(value), ngModelOptions.timezone);
+            } else {
+              cache[key] = new Date(dateFilter(value, 'medium'));
+            }
 
-          scope.watchData[key] = cache[key] || dateParser.fromTimezone(new Date(value), ngModelOptions.timezone);
-        });
+            scope.watchData[key] = value === null ? null : cache[key];
+          } else {
+            scope.watchData[key] = dateParser.fromTimezone(new Date(value), ngModelOptions.timezone);
+          }
+        }));
 
         datepickerEl.attr(cameltoDash(key), 'watchData.' + key);
       }
@@ -2397,7 +2426,7 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
         }
         scope.date = dateParser.fromTimezone(value, ngModelOptions.timezone);
         dateFormat = dateFormat.replace(/M!/, 'MM')
-          .replace(/d!/, 'dd');
+            .replace(/d!/, 'dd');
 
         return dateFilter(scope.date, dateFormat);
       });
@@ -2437,6 +2466,11 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
       $popup.remove();
       element.unbind('keydown', inputKeydownBind);
       $document.unbind('click', documentClickBind);
+
+      //Clear all watch listeners on destroy
+      while (watchListeners.length) {
+        watchListeners.shift()();
+      }
     });
   };
 
@@ -2450,7 +2484,7 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
     }
 
     return scope.watchData.minDate && scope.compare(date, cache.minDate) < 0 ||
-      scope.watchData.maxDate && scope.compare(date, cache.maxDate) > 0;
+        scope.watchData.maxDate && scope.compare(date, cache.maxDate) > 0;
   };
 
   scope.compare = function(date1, date2) {
@@ -2500,9 +2534,9 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
 
   scope.disabled = angular.isDefined(attrs.disabled) || false;
   if (attrs.ngDisabled) {
-    scope.$parent.$watch($parse(attrs.ngDisabled), function(disabled) {
+    watchListeners.push(scope.$parent.$watch($parse(attrs.ngDisabled), function(disabled) {
       scope.disabled = disabled;
-    });
+    }));
   }
 
   scope.$watch('isOpen', function(value) {
@@ -3552,9 +3586,8 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
           angularDomEl.attr('modal-animation', 'true');
         }
 
-        $animate.enter(angularDomEl, appendToElement)
+        $animate.enter($compile(angularDomEl)(modal.scope), appendToElement)
           .then(function() {
-            $compile(angularDomEl)(modal.scope);
             $animate.addClass(appendToElement, modalBodyClass);
           });
 
@@ -3806,6 +3839,7 @@ angular.module('ui.bootstrap.paging', [])
     create: function(ctrl, $scope, $attrs) {
       ctrl.setNumPages = $attrs.numPages ? $parse($attrs.numPages).assign : angular.noop;
       ctrl.ngModelCtrl = { $setViewValue: angular.noop }; // nullModelCtrl
+      ctrl._watchers = [];
 
       ctrl.init = function(ngModelCtrl, config) {
         ctrl.ngModelCtrl = ngModelCtrl;
@@ -3816,11 +3850,11 @@ angular.module('ui.bootstrap.paging', [])
         };
 
         if ($attrs.itemsPerPage) {
-          $scope.$parent.$watch($parse($attrs.itemsPerPage), function(value) {
+          ctrl._watchers.push($scope.$parent.$watch($parse($attrs.itemsPerPage), function(value) {
             ctrl.itemsPerPage = parseInt(value, 10);
             $scope.totalPages = ctrl.calculateTotalPages();
             ctrl.updatePage();
-          });
+          }));
         } else {
           ctrl.itemsPerPage = config.itemsPerPage;
         }
@@ -3878,6 +3912,12 @@ angular.module('ui.bootstrap.paging', [])
           ctrl.ngModelCtrl.$render();
         }
       };
+
+      $scope.$on('$destroy', function() {
+        while (ctrl._watchers.length) {
+          ctrl._watchers.shift()();
+        }
+      });
     }
   };
 }]);
@@ -3938,10 +3978,10 @@ angular.module('ui.bootstrap.pagination', ['ui.bootstrap.paging'])
   uibPaging.create(this, $scope, $attrs);
 
   if ($attrs.maxSize) {
-    $scope.$parent.$watch($parse($attrs.maxSize), function(value) {
+    ctrl._watchers.push($scope.$parent.$watch($parse($attrs.maxSize), function(value) {
       maxSize = parseInt(value, 10);
       ctrl.render();
-    });
+    }));
   }
 
   // Create page object used in template
@@ -4266,7 +4306,7 @@ angular.module('ui.bootstrap.tooltip', ['ui.bootstrap.position', 'ui.bootstrap.s
                     options.placementClassPrefix + 'right-bottom');
 
                   var placement = ttPosition.placement.split('-');
-                  tooltip.addClass(placement[0], options.placementClassPrefix + ttPosition.placement);
+                  tooltip.addClass(placement[0] + ' ' + options.placementClassPrefix + ttPosition.placement);
                   $position.positionArrow(tooltip, ttPosition.placement);
 
                   positionTimeout = null;
@@ -4364,18 +4404,20 @@ angular.module('ui.bootstrap.tooltip', ['ui.bootstrap.position', 'ui.bootstrap.s
 
               // First things first: we don't show it anymore.
               ttScope.$evalAsync(function() {
-                ttScope.isOpen = false;
-                assignIsOpen(false);
-                // And now we remove it from the DOM. However, if we have animation, we
-                // need to wait for it to expire beforehand.
-                // FIXME: this is a placeholder for a port of the transitions library.
-                // The fade transition in TWBS is 150ms.
-                if (ttScope.animation) {
-                  if (!transitionTimeout) {
-                    transitionTimeout = $timeout(removeTooltip, 150, false);
+                if(ttScope){
+                  ttScope.isOpen = false;
+                  assignIsOpen(false);
+                  // And now we remove it from the DOM. However, if we have animation, we
+                  // need to wait for it to expire beforehand.
+                  // FIXME: this is a placeholder for a port of the transitions library.
+                  // The fade transition in TWBS is 150ms.
+                  if (ttScope.animation) {
+                    if (!transitionTimeout) {
+                      transitionTimeout = $timeout(removeTooltip, 150, false);
+                    }
+                  } else {
+                    removeTooltip();
                   }
-                } else {
-                  removeTooltip();
                 }
               });
             }
@@ -5222,8 +5264,9 @@ angular.module('ui.bootstrap.timepicker', [])
 
 .controller('UibTimepickerController', ['$scope', '$element', '$attrs', '$parse', '$log', '$locale', 'uibTimepickerConfig', function($scope, $element, $attrs, $parse, $log, $locale, timepickerConfig) {
   var selected = new Date(),
-      ngModelCtrl = { $setViewValue: angular.noop }, // nullModelCtrl
-      meridians = angular.isDefined($attrs.meridians) ? $scope.$parent.$eval($attrs.meridians) : timepickerConfig.meridians || $locale.DATETIME_FORMATS.AMPMS;
+    watchers = [],
+    ngModelCtrl = { $setViewValue: angular.noop }, // nullModelCtrl
+    meridians = angular.isDefined($attrs.meridians) ? $scope.$parent.$eval($attrs.meridians) : timepickerConfig.meridians || $locale.DATETIME_FORMATS.AMPMS;
 
   $scope.tabindex = angular.isDefined($attrs.tabindex) ? $attrs.tabindex : 0;
   $element.removeAttr('tabindex');
@@ -5257,35 +5300,35 @@ angular.module('ui.bootstrap.timepicker', [])
 
   var hourStep = timepickerConfig.hourStep;
   if ($attrs.hourStep) {
-    $scope.$parent.$watch($parse($attrs.hourStep), function(value) {
+    watchers.push($scope.$parent.$watch($parse($attrs.hourStep), function(value) {
       hourStep = +value;
-    });
+    }));
   }
 
   var minuteStep = timepickerConfig.minuteStep;
   if ($attrs.minuteStep) {
-    $scope.$parent.$watch($parse($attrs.minuteStep), function(value) {
+    watchers.push($scope.$parent.$watch($parse($attrs.minuteStep), function(value) {
       minuteStep = +value;
-    });
+    }));
   }
 
   var min;
-  $scope.$parent.$watch($parse($attrs.min), function(value) {
+  watchers.push($scope.$parent.$watch($parse($attrs.min), function(value) {
     var dt = new Date(value);
     min = isNaN(dt) ? undefined : dt;
-  });
+  }));
 
   var max;
-  $scope.$parent.$watch($parse($attrs.max), function(value) {
+  watchers.push($scope.$parent.$watch($parse($attrs.max), function(value) {
     var dt = new Date(value);
     max = isNaN(dt) ? undefined : dt;
-  });
+  }));
 
   var disabled = false;
   if ($attrs.ngDisabled) {
-    $scope.$parent.$watch($parse($attrs.ngDisabled), function(value) {
+    watchers.push($scope.$parent.$watch($parse($attrs.ngDisabled), function(value) {
       disabled = value;
-    });
+    }));
   }
 
   $scope.noIncrementHours = function() {
@@ -5334,22 +5377,22 @@ angular.module('ui.bootstrap.timepicker', [])
 
   var secondStep = timepickerConfig.secondStep;
   if ($attrs.secondStep) {
-    $scope.$parent.$watch($parse($attrs.secondStep), function(value) {
+    watchers.push($scope.$parent.$watch($parse($attrs.secondStep), function(value) {
       secondStep = +value;
-    });
+    }));
   }
 
   $scope.showSeconds = timepickerConfig.showSeconds;
   if ($attrs.showSeconds) {
-    $scope.$parent.$watch($parse($attrs.showSeconds), function(value) {
+    watchers.push($scope.$parent.$watch($parse($attrs.showSeconds), function(value) {
       $scope.showSeconds = !!value;
-    });
+    }));
   }
 
   // 12H / 24H mode
   $scope.showMeridian = timepickerConfig.showMeridian;
   if ($attrs.showMeridian) {
-    $scope.$parent.$watch($parse($attrs.showMeridian), function(value) {
+    watchers.push($scope.$parent.$watch($parse($attrs.showMeridian), function(value) {
       $scope.showMeridian = !!value;
 
       if (ngModelCtrl.$error.time) {
@@ -5362,7 +5405,7 @@ angular.module('ui.bootstrap.timepicker', [])
       } else {
         updateTemplate();
       }
-    });
+    }));
   }
 
   // Get $scope.hours in 24H mode if valid
@@ -5724,6 +5767,12 @@ angular.module('ui.bootstrap.timepicker', [])
   $scope.blur = function() {
     ngModelCtrl.$setTouched();
   };
+
+  $scope.$on('$destroy', function() {
+    while (watchers.length) {
+      watchers.shift()();
+    }
+  });
 }])
 
 .directive('uibTimepicker', ['uibTimepickerConfig', function(uibTimepickerConfig) {
@@ -6394,4 +6443,6 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
     };
   }]);
 angular.module('ui.bootstrap.carousel').run(function() {!angular.$$csp().noInlineStyle && angular.element(document).find('head').prepend('<style type="text/css">.ng-animate.item:not(.left):not(.right){-webkit-transition:0s ease-in-out left;transition:0s ease-in-out left}</style>'); });
-angular.module('ui.bootstrap.tabs').run(function() {!angular.$$csp().noInlineStyle && angular.element(document).find('head').prepend('<style type="text/css">.uib-tab > div{position:relative;display:block;padding:10px 15px;outline:0;color:#337ab7;}.uib-tab > div:focus,.uib-tab > div:hover{background-color:#eee;color:#23527c;}.uib-tab.disabled > div{color:#777;}.uib-tab.disabled > div:focus,.uib-tab.disabled > div:hover{color:#777;cursor:not-allowed;background-color:transparent;}.nav-tabs > .uib-tab > div{margin-right:2px;line-height:1.42857143;border:1px solid transparent;border-radius:4px 4px 0 0;}.nav-tabs > .uib-tab > div:hover{border-color:#eee #eee #ddd;}.nav-tabs > .uib-tab.active > div,.nav-tabs > .uib-tab.active > div:focus,.nav-tabs > .uib-tab.active > div:hover{color:#555;cursor:default;background-color:#fff;border-color:#ddd #ddd transparent #ddd;}.nav-pills > .uib-tab > div{border-radius:4px;}.nav-pills > .uib-tab.active > div,.nav-pills > .uib-tab.active > div:focus,.nav-pills > .uib-tab.active > div:hover{color:#fff;background-color:#337ab7;}</style>'); });
+angular.module('ui.bootstrap.datepicker').run(function() {!angular.$$csp().noInlineStyle && angular.element(document).find('head').prepend('<style type="text/css">.uib-datepicker .uib-title{width:100%;}.uib-day button,.uib-month button,.uib-year button{min-width:100%;}.uib-datepicker-popup.dropdown-menu{display:block;}.uib-button-bar{padding:10px 9px 2px;}</style>'); });
+angular.module('ui.bootstrap.timepicker').run(function() {!angular.$$csp().noInlineStyle && angular.element(document).find('head').prepend('<style type="text/css">.uib-time input{width:50px;}</style>'); });
+angular.module('ui.bootstrap.typeahead').run(function() {!angular.$$csp().noInlineStyle && angular.element(document).find('head').prepend('<style type="text/css">[uib-typeahead-popup].dropdown-menu{display:block;}</style>'); });
