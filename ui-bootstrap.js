@@ -2,7 +2,7 @@
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 1.1.0 - 2016-01-18
+ * Version: 1.1.1 - 2016-01-25
  * License: MIT
  */angular.module("ui.bootstrap", ["ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
 angular.module('ui.bootstrap.collapse', [])
@@ -2341,15 +2341,14 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
       }
     }
 
-    if (attrs.datepickerOptions) {
-      var options = scope.$parent.$eval(attrs.datepickerOptions);
-      if (options && options.initDate) {
-        scope.initDate = dateParser.fromTimezone(options.initDate, ngModelOptions.timezone);
-        datepickerEl.attr('init-date', 'initDate');
-        delete options.initDate;
-      }
-      angular.forEach(options, function(value, option) {
-        datepickerEl.attr(cameltoDash(option), value);
+    if (scope.datepickerOptions) {
+      angular.forEach(scope.datepickerOptions, function(value, option) {
+        // Ignore this options, will be managed later
+        if (['minDate', 'maxDate', 'minMode', 'maxMode', 'initDate', 'datepickerMode'].indexOf(option) === -1) {
+          datepickerEl.attr(cameltoDash(option), value);
+        } else {
+          datepickerEl.attr(cameltoDash(option), 'datepickerOptions.' + option);
+        }
       });
     }
 
@@ -2442,7 +2441,7 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
       scope.date = parseDateString(ngModel.$viewValue);
     });
 
-    element.bind('keydown', inputKeydownBind);
+    element.on('keydown', inputKeydownBind);
 
     $popup = $compile(popupEl)(scope);
     // Prevent jQuery cache memory leak (template is now redundant after linking)
@@ -2464,8 +2463,8 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
       }
 
       $popup.remove();
-      element.unbind('keydown', inputKeydownBind);
-      $document.unbind('click', documentClickBind);
+      element.off('keydown', inputKeydownBind);
+      $document.off('click', documentClickBind);
 
       //Clear all watch listeners on destroy
       while (watchListeners.length) {
@@ -2549,13 +2548,13 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
           if (onOpenFocus) {
             scope.$broadcast('uib:datepicker.focus');
           }
-          $document.bind('click', documentClickBind);
+          $document.on('click', documentClickBind);
         }, 0, false);
       } else {
         scope.isOpen = false;
       }
     } else {
-      $document.unbind('click', documentClickBind);
+      $document.off('click', documentClickBind);
     }
   });
 
@@ -2666,6 +2665,7 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
     require: ['ngModel', 'uibDatepickerPopup'],
     controller: 'UibDatepickerPopupController',
     scope: {
+      datepickerOptions: '=?',
       isOpen: '=?',
       currentText: '@',
       clearText: '@',
@@ -3411,7 +3411,7 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
           openedClasses.remove(modalBodyClass, modalInstance);
           appendToElement.toggleClass(modalBodyClass, openedClasses.hasKey(modalBodyClass));
           toggleTopWindowClass(true);
-        });
+        }, modalWindow.closedDeferred);
         checkRemoveBackdrop();
 
         //move focus to specified element if available, or else to body
@@ -4404,7 +4404,7 @@ angular.module('ui.bootstrap.tooltip', ['ui.bootstrap.position', 'ui.bootstrap.s
 
               // First things first: we don't show it anymore.
               ttScope.$evalAsync(function() {
-                if(ttScope){
+                if (ttScope) {
                   ttScope.isOpen = false;
                   assignIsOpen(false);
                   // And now we remove it from the DOM. However, if we have animation, we
@@ -4427,6 +4427,7 @@ angular.module('ui.bootstrap.tooltip', ['ui.bootstrap.position', 'ui.bootstrap.s
                 $timeout.cancel(hideTimeout);
                 hideTimeout = null;
               }
+
               if (transitionTimeout) {
                 $timeout.cancel(transitionTimeout);
                 transitionTimeout = null;

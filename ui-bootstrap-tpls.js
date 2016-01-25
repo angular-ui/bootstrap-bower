@@ -2,7 +2,7 @@
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 1.1.0 - 2016-01-18
+ * Version: 1.1.1 - 2016-01-25
  * License: MIT
  */angular.module("ui.bootstrap", ["ui.bootstrap.tpls", "ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
 angular.module("ui.bootstrap.tpls", ["uib/template/accordion/accordion-group.html","uib/template/accordion/accordion.html","uib/template/alert/alert.html","uib/template/carousel/carousel.html","uib/template/carousel/slide.html","uib/template/datepicker/datepicker.html","uib/template/datepicker/day.html","uib/template/datepicker/month.html","uib/template/datepicker/popup.html","uib/template/datepicker/year.html","uib/template/modal/backdrop.html","uib/template/modal/window.html","uib/template/pager/pager.html","uib/template/pagination/pagination.html","uib/template/tooltip/tooltip-html-popup.html","uib/template/tooltip/tooltip-popup.html","uib/template/tooltip/tooltip-template-popup.html","uib/template/popover/popover-html.html","uib/template/popover/popover-template.html","uib/template/popover/popover.html","uib/template/progressbar/bar.html","uib/template/progressbar/progress.html","uib/template/progressbar/progressbar.html","uib/template/rating/rating.html","uib/template/tabs/tab.html","uib/template/tabs/tabset.html","uib/template/timepicker/timepicker.html","uib/template/typeahead/typeahead-match.html","uib/template/typeahead/typeahead-popup.html"]);
@@ -2342,15 +2342,14 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
       }
     }
 
-    if (attrs.datepickerOptions) {
-      var options = scope.$parent.$eval(attrs.datepickerOptions);
-      if (options && options.initDate) {
-        scope.initDate = dateParser.fromTimezone(options.initDate, ngModelOptions.timezone);
-        datepickerEl.attr('init-date', 'initDate');
-        delete options.initDate;
-      }
-      angular.forEach(options, function(value, option) {
-        datepickerEl.attr(cameltoDash(option), value);
+    if (scope.datepickerOptions) {
+      angular.forEach(scope.datepickerOptions, function(value, option) {
+        // Ignore this options, will be managed later
+        if (['minDate', 'maxDate', 'minMode', 'maxMode', 'initDate', 'datepickerMode'].indexOf(option) === -1) {
+          datepickerEl.attr(cameltoDash(option), value);
+        } else {
+          datepickerEl.attr(cameltoDash(option), 'datepickerOptions.' + option);
+        }
       });
     }
 
@@ -2443,7 +2442,7 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
       scope.date = parseDateString(ngModel.$viewValue);
     });
 
-    element.bind('keydown', inputKeydownBind);
+    element.on('keydown', inputKeydownBind);
 
     $popup = $compile(popupEl)(scope);
     // Prevent jQuery cache memory leak (template is now redundant after linking)
@@ -2465,8 +2464,8 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
       }
 
       $popup.remove();
-      element.unbind('keydown', inputKeydownBind);
-      $document.unbind('click', documentClickBind);
+      element.off('keydown', inputKeydownBind);
+      $document.off('click', documentClickBind);
 
       //Clear all watch listeners on destroy
       while (watchListeners.length) {
@@ -2550,13 +2549,13 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
           if (onOpenFocus) {
             scope.$broadcast('uib:datepicker.focus');
           }
-          $document.bind('click', documentClickBind);
+          $document.on('click', documentClickBind);
         }, 0, false);
       } else {
         scope.isOpen = false;
       }
     } else {
-      $document.unbind('click', documentClickBind);
+      $document.off('click', documentClickBind);
     }
   });
 
@@ -2667,6 +2666,7 @@ function(scope, element, attrs, $compile, $parse, $document, $rootScope, $positi
     require: ['ngModel', 'uibDatepickerPopup'],
     controller: 'UibDatepickerPopupController',
     scope: {
+      datepickerOptions: '=?',
       isOpen: '=?',
       currentText: '@',
       clearText: '@',
@@ -3412,7 +3412,7 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
           openedClasses.remove(modalBodyClass, modalInstance);
           appendToElement.toggleClass(modalBodyClass, openedClasses.hasKey(modalBodyClass));
           toggleTopWindowClass(true);
-        });
+        }, modalWindow.closedDeferred);
         checkRemoveBackdrop();
 
         //move focus to specified element if available, or else to body
@@ -4405,7 +4405,7 @@ angular.module('ui.bootstrap.tooltip', ['ui.bootstrap.position', 'ui.bootstrap.s
 
               // First things first: we don't show it anymore.
               ttScope.$evalAsync(function() {
-                if(ttScope){
+                if (ttScope) {
                   ttScope.isOpen = false;
                   assignIsOpen(false);
                   // And now we remove it from the DOM. However, if we have animation, we
@@ -4428,6 +4428,7 @@ angular.module('ui.bootstrap.tooltip', ['ui.bootstrap.position', 'ui.bootstrap.s
                 $timeout.cancel(hideTimeout);
                 hideTimeout = null;
               }
+
               if (transitionTimeout) {
                 $timeout.cancel(transitionTimeout);
                 transitionTimeout = null;
@@ -6675,18 +6676,6 @@ angular.module("uib/template/tooltip/tooltip-html-popup.html", []).run(["$templa
     "  ng-class=\"{ in: isOpen() }\">\n" +
     "  <div class=\"tooltip-arrow\"></div>\n" +
     "  <div class=\"tooltip-inner\" ng-bind-html=\"contentExp()\"></div>\n" +
-    "</div>\n" +
-    "");
-}]);
-
-angular.module("template/tooltip/tooltip-html-unsafe-popup.html", []).run(["$templateCache", function($templateCache) {
-  $templateCache.put("template/tooltip/tooltip-html-unsafe-popup.html",
-    "<div class=\"tooltip\"\n" +
-    "  tooltip-animation-class=\"fade\"\n" +
-    "  tooltip-classes\n" +
-    "  ng-class=\"{ in: isOpen() }\">\n" +
-    "  <div class=\"tooltip-arrow\"></div>\n" +
-    "  <div class=\"tooltip-inner\" bind-html-unsafe=\"content\"></div>\n" +
     "</div>\n" +
     "");
 }]);
