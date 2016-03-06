@@ -2,7 +2,7 @@
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 1.2.2 - 2016-03-03
+ * Version: 1.2.3 - 2016-03-05
  * License: MIT
  */angular.module("ui.bootstrap", ["ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.position","ui.bootstrap.datepicker","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
 angular.module('ui.bootstrap.collapse', [])
@@ -1680,7 +1680,7 @@ angular.module('ui.bootstrap.position', [])
         var targetElemPos = {top: 0, left: 0, placement: ''};
 
         if (placement[2]) {
-          var viewportOffset = this.viewportOffset(hostElem);
+          var viewportOffset = this.viewportOffset(hostElem, appendToBody);
 
           var targetElemStyle = $window.getComputedStyle(targetElem);
           var adjustedSize = {
@@ -2146,12 +2146,17 @@ angular.module('ui.bootstrap.datepicker', ['ui.bootstrap.dateparser', 'ui.bootst
   this.createDateObject = function(date, format) {
     var model = ngModelCtrl.$viewValue ? new Date(ngModelCtrl.$viewValue) : null;
     model = dateParser.fromTimezone(model, ngModelOptions.timezone);
+    var today = new Date();
+    today = dateParser.fromTimezone(today, ngModelOptions.timezone);
+    var time = this.compare(date, today);
     var dt = {
       date: date,
       label: dateParser.filter(date, format),
       selected: model && this.compare(date, model) === 0,
       disabled: this.isDisabled(date),
-      current: this.compare(date, new Date()) === 0,
+      past: time < 0,
+      current: time === 0,
+      future: time > 0,
       customClass: this.customClass(date) || null
     };
 
@@ -3234,7 +3239,12 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
   };
 
   this.toggle = function(open) {
-    return scope.isOpen = arguments.length ? !!open : !scope.isOpen;
+    scope.isOpen = arguments.length ? !!open : !scope.isOpen;
+    if (angular.isFunction(setIsOpen)) {
+      setIsOpen(scope, scope.isOpen);
+    }
+
+    return scope.isOpen;
   };
 
   // Allow other directives to watch status
@@ -3615,8 +3625,8 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
 /**
  * A helper directive for the $modal service. It creates a backdrop element.
  */
-  .directive('uibModalBackdrop', ['$animateCss', '$injector', '$uibModalStack',
-  function($animateCss, $injector, $modalStack) {
+  .directive('uibModalBackdrop', ['$animate', '$injector', '$uibModalStack',
+  function($animate, $injector, $modalStack) {
     return {
       replace: true,
       templateUrl: 'uib/template/modal/backdrop.html',
@@ -3628,16 +3638,12 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
 
     function linkFn(scope, element, attrs) {
       if (attrs.modalInClass) {
-        $animateCss(element, {
-          addClass: attrs.modalInClass
-        }).start();
+        $animate.addClass(element, attrs.modalInClass);
 
         scope.$on($modalStack.NOW_CLOSING_EVENT, function(e, setIsAsync) {
           var done = setIsAsync();
           if (scope.modalOptions.animation) {
-            $animateCss(element, {
-              removeClass: attrs.modalInClass
-            }).start().then(done);
+            $animate.removeClass(element, attrs.modalInClass).then(done);
           } else {
             done();
           }
@@ -3646,8 +3652,8 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
     }
   }])
 
-  .directive('uibModalWindow', ['$uibModalStack', '$q', '$animate', '$animateCss', '$document',
-  function($modalStack, $q, $animate, $animateCss, $document) {
+  .directive('uibModalWindow', ['$uibModalStack', '$q', '$animateCss', '$document',
+  function($modalStack, $q, $animateCss, $document) {
     return {
       scope: {
         index: '@'
@@ -3701,13 +3707,9 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap'])
 
             scope.$on($modalStack.NOW_CLOSING_EVENT, function(e, setIsAsync) {
               var done = setIsAsync();
-              if ($animateCss) {
-                $animateCss(element, {
-                  removeClass: attrs.modalInClass
-                }).start().then(done);
-              } else {
-                $animate.removeClass(element, attrs.modalInClass).then(done);
-              }
+              $animateCss(element, {
+                removeClass: attrs.modalInClass
+              }).start().then(done);
             });
           }
 
@@ -5719,7 +5721,8 @@ angular.module('ui.bootstrap.tabs', [])
       node.hasAttribute('x-uib-tab-heading') ||
       node.tagName.toLowerCase() === 'uib-tab-heading' ||
       node.tagName.toLowerCase() === 'data-uib-tab-heading' ||
-      node.tagName.toLowerCase() === 'x-uib-tab-heading'
+      node.tagName.toLowerCase() === 'x-uib-tab-heading' ||
+      node.tagName.toLowerCase() === 'uib:tab-heading'
     );
   }
 });
@@ -6676,7 +6679,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
           evt.stopPropagation();
 
           resetMatches();
-          scope.$digest();
+          originalScope.$digest();
           break;
         case 38:
           scope.activeIdx = (scope.activeIdx > 0 ? scope.activeIdx : scope.matches.length) - 1;
@@ -6730,7 +6733,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
       if (element[0] !== evt.target && evt.which !== 3 && scope.matches.length !== 0) {
         resetMatches();
         if (!$rootScope.$$phase) {
-          scope.$digest();
+          originalScope.$digest();
         }
       }
     };
