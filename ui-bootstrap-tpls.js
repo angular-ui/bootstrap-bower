@@ -2,7 +2,7 @@
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 1.3.0 - 2016-04-04
+ * Version: 1.3.1 - 2016-04-05
  * License: MIT
  */angular.module("ui.bootstrap", ["ui.bootstrap.tpls", "ui.bootstrap.collapse","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.datepicker","ui.bootstrap.position","ui.bootstrap.datepickerPopup","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
 angular.module("ui.bootstrap.tpls", ["uib/template/accordion/accordion-group.html","uib/template/accordion/accordion.html","uib/template/alert/alert.html","uib/template/carousel/carousel.html","uib/template/carousel/slide.html","uib/template/datepicker/datepicker.html","uib/template/datepicker/day.html","uib/template/datepicker/month.html","uib/template/datepicker/year.html","uib/template/datepickerPopup/popup.html","uib/template/modal/backdrop.html","uib/template/modal/window.html","uib/template/pager/pager.html","uib/template/pagination/pagination.html","uib/template/tooltip/tooltip-html-popup.html","uib/template/tooltip/tooltip-popup.html","uib/template/tooltip/tooltip-template-popup.html","uib/template/popover/popover-html.html","uib/template/popover/popover-template.html","uib/template/popover/popover.html","uib/template/progressbar/bar.html","uib/template/progressbar/progress.html","uib/template/progressbar/progressbar.html","uib/template/rating/rating.html","uib/template/tabs/tab.html","uib/template/tabs/tabset.html","uib/template/timepicker/timepicker.html","uib/template/typeahead/typeahead-match.html","uib/template/typeahead/typeahead-popup.html"]);
@@ -3677,6 +3677,8 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.p
       var $modalStack = {
         NOW_CLOSING_EVENT: 'modal.stack.now-closing'
       };
+      var topModalIndex = 0;
+      var previousTopOpenedModal = null;
 
       //Modal focus behavior
       var tabableSelector = 'a[href], area[href], input:not([disabled]), ' +
@@ -3698,6 +3700,12 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.p
             topBackdropIndex = i;
           }
         }
+
+        // If any backdrop exist, ensure that it's index is always
+        // right below the top modal
+        if (topBackdropIndex > -1 && topBackdropIndex < topModalIndex) {
+          topBackdropIndex = topModalIndex;
+        }
         return topBackdropIndex;
       }
 
@@ -3713,6 +3721,10 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.p
 
         //clean up the stack
         openedWindows.remove(modalInstance);
+        previousTopOpenedModal = openedWindows.top();
+        if (previousTopOpenedModal) {
+          topModalIndex = parseInt(previousTopOpenedModal.value.modalDomEl.attr('index'), 10);
+        }
 
         removeAfterAnimate(modalWindow.modalDomEl, modalWindow.modalScope, function() {
           var modalBodyClass = modalWindow.openedClass || OPENED_MODAL_CLASS;
@@ -3852,6 +3864,10 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.p
           modalBodyClass = modal.openedClass || OPENED_MODAL_CLASS;
 
         toggleTopWindowClass(false);
+        
+        // Store the current top first, to determine what index we ought to use
+        // for the current top modal
+        previousTopOpenedModal = openedWindows.top();
 
         openedWindows.add(modalInstance, {
           deferred: modal.deferred,
@@ -3888,13 +3904,15 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.p
           $animate.enter(backdropDomEl, appendToElement);
         }
 
+        // Set the top modal index based on the index of the previous top modal
+        topModalIndex = previousTopOpenedModal ? parseInt(previousTopOpenedModal.value.modalDomEl.attr('index'), 10) + 1 : 0;
         var angularDomEl = angular.element('<div uib-modal-window="modal-window"></div>');
         angularDomEl.attr({
           'template-url': modal.windowTemplateUrl,
           'window-class': modal.windowClass,
           'window-top-class': modal.windowTopClass,
           'size': modal.size,
-          'index': openedWindows.length() - 1,
+          'index': topModalIndex,
           'animate': 'animate'
         }).html(modal.content);
         if (modal.animation) {
