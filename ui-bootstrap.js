@@ -2,7 +2,7 @@
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 2.0.0 - 2016-07-19
+ * Version: 2.0.1 - 2016-08-02
  * License: MIT
  */angular.module("ui.bootstrap", ["ui.bootstrap.collapse","ui.bootstrap.tabindex","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.datepicker","ui.bootstrap.position","ui.bootstrap.datepickerPopup","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
 angular.module('ui.bootstrap.collapse', [])
@@ -4079,7 +4079,7 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.p
           'size': modal.size,
           'index': topModalIndex,
           'animate': 'animate',
-          'ng-style': '{\'z-index\': 1050 + index*10, display: \'block\'}',
+          'ng-style': '{\'z-index\': 1050 + $$topModalIndex*10, display: \'block\'}',
           'tabindex': -1,
           'uib-modal-animation-class': 'fade',
           'modal-in-class': 'in'
@@ -4093,6 +4093,11 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.p
         }
 
         appendToElement.addClass(modalBodyClass);
+        if (modal.scope) {
+          // we need to explicitly add the modal index to the modal scope
+          // because it is needed by ngStyle to compute the zIndex property.
+          modal.scope.$$topModalIndex = topModalIndex;
+        }
         $animate.enter($compile(angularDomEl)(modal.scope), appendToElement);
 
         openedWindows.top().value.modalDomEl = angularDomEl;
