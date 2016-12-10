@@ -2,9 +2,9 @@
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 2.3.0 - 2016-11-26
+ * Version: 2.3.1 - 2016-12-10
  * License: MIT
- */angular.module("ui.bootstrap", ["ui.bootstrap.collapse","ui.bootstrap.tabindex","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.datepicker","ui.bootstrap.position","ui.bootstrap.datepickerPopup","ui.bootstrap.debounce","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
+ */angular.module("ui.bootstrap", ["ui.bootstrap.collapse","ui.bootstrap.tabindex","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.datepicker","ui.bootstrap.position","ui.bootstrap.datepickerPopup","ui.bootstrap.debounce","ui.bootstrap.multiMap","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
 angular.module('ui.bootstrap.collapse', [])
 
   .directive('uibCollapse', ['$animate', '$q', '$parse', '$injector', function($animate, $q, $parse, $injector) {
@@ -892,12 +892,6 @@ angular.module('ui.bootstrap.dateparser', [])
         formatter: function(date) { return dateFilter(date, 'M'); }
       },
       {
-        key: 'LLLL',
-        regex: $locale.DATETIME_FORMATS.STANDALONEMONTH.join('|'),
-        apply: function(value) { this.month = $locale.DATETIME_FORMATS.STANDALONEMONTH.indexOf(value); },
-        formatter: function(date) { return dateFilter(date, 'LLLL'); }
-      },
-      {
         key: 'd!',
         regex: '[0-2]?[0-9]{1}|3[0-1]{1}',
         apply: function(value) { this.date = +value; },
@@ -1046,6 +1040,15 @@ angular.module('ui.bootstrap.dateparser', [])
         formatter: function(date) { return dateFilter(date, 'G'); }
       }
     ];
+
+    if (angular.version.major >= 1 && angular.version.minor > 4) {
+      formatCodeToRegex.push({
+        key: 'LLLL',
+        regex: $locale.DATETIME_FORMATS.STANDALONEMONTH.join('|'),
+        apply: function(value) { this.month = $locale.DATETIME_FORMATS.STANDALONEMONTH.indexOf(value); },
+        formatter: function(date) { return dateFilter(date, 'LLLL'); }
+      });
+    }
   };
 
   this.init();
@@ -3037,7 +3040,7 @@ function($scope, $element, $attrs, $compile, $log, $parse, $window, $document, $
     if (angular.isString(viewValue)) {
       var date = parseDateString(viewValue);
       if (!isNaN(date)) {
-        return dateParser.fromTimezone(date, ngModelOptions.timezone);
+        return dateParser.toTimezone(date, ngModelOptions.timezone);
       }
     }
 
@@ -3173,17 +3176,92 @@ angular.module('ui.bootstrap.debounce', [])
     };
   }]);
 
-angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
+angular.module('ui.bootstrap.multiMap', [])
+/**
+ * A helper, internal data structure that stores all references attached to key
+ */
+  .factory('$$multiMap', function() {
+    return {
+      createNew: function() {
+        var map = {};
+
+        return {
+          entries: function() {
+            return Object.keys(map).map(function(key) {
+              return {
+                key: key,
+                value: map[key]
+              };
+            });
+          },
+          get: function(key) {
+            return map[key];
+          },
+          hasKey: function(key) {
+            return !!map[key];
+          },
+          keys: function() {
+            return Object.keys(map);
+          },
+          put: function(key, value) {
+            if (!map[key]) {
+              map[key] = [];
+            }
+
+            map[key].push(value);
+          },
+          remove: function(key, value) {
+            var values = map[key];
+
+            if (!values) {
+              return;
+            }
+
+            var idx = values.indexOf(value);
+
+            if (idx !== -1) {
+              values.splice(idx, 1);
+            }
+
+            if (!values.length) {
+              delete map[key];
+            }
+          }
+        };
+      }
+    };
+  });
+
+angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.multiMap', 'ui.bootstrap.position'])
 
 .constant('uibDropdownConfig', {
   appendToOpenClass: 'uib-dropdown-open',
   openClass: 'open'
 })
 
-.service('uibDropdownService', ['$document', '$rootScope', function($document, $rootScope) {
+.service('uibDropdownService', ['$document', '$rootScope', '$$multiMap', function($document, $rootScope, $$multiMap) {
   var openScope = null;
+  var openedContainers = $$multiMap.createNew();
 
-  this.open = function(dropdownScope, element) {
+  this.isOnlyOpen = function(dropdownScope, appendTo) {
+    var openedDropdowns = openedContainers.get(appendTo);
+    if (openedDropdowns) {
+      var openDropdown = openedDropdowns.reduce(function(toClose, dropdown) {
+        if (dropdown.scope === dropdownScope) {
+          return dropdown;
+        }
+
+        return toClose;
+      }, {});
+      if (openDropdown) {
+        return openedDropdowns.length === 1;
+      }
+    }
+
+    return false;
+  };
+
+  this.open = function(dropdownScope, element, appendTo) {
     if (!openScope) {
       $document.on('click', closeDropdown);
     }
@@ -3193,13 +3271,51 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
     }
 
     openScope = dropdownScope;
+
+    if (!appendTo) {
+      return;
+    }
+
+    var openedDropdowns = openedContainers.get(appendTo);
+    if (openedDropdowns) {
+      var openedScopes = openedDropdowns.map(function(dropdown) {
+        return dropdown.scope;
+      });
+      if (openedScopes.indexOf(dropdownScope) === -1) {
+        openedContainers.put(appendTo, {
+          scope: dropdownScope
+        });
+      }
+    } else {
+      openedContainers.put(appendTo, {
+        scope: dropdownScope
+      });
+    }
   };
 
-  this.close = function(dropdownScope, element) {
+  this.close = function(dropdownScope, element, appendTo) {
     if (openScope === dropdownScope) {
       $document.off('click', closeDropdown);
       $document.off('keydown', this.keybindFilter);
       openScope = null;
+    }
+
+    if (!appendTo) {
+      return;
+    }
+
+    var openedDropdowns = openedContainers.get(appendTo);
+    if (openedDropdowns) {
+      var dropdownToClose = openedDropdowns.reduce(function(toClose, dropdown) {
+        if (dropdown.scope === dropdownScope) {
+          return dropdown;
+        }
+
+        return toClose;
+      }, {});
+      if (dropdownToClose) {
+        openedContainers.remove(appendTo, dropdownToClose);
+      }
     }
   };
 
@@ -3419,10 +3535,18 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
     }
 
     var openContainer = appendTo ? appendTo : $element;
-    var hasOpenClass = openContainer.hasClass(appendTo ? appendToOpenClass : openClass);
+    var dropdownOpenClass = appendTo ? appendToOpenClass : openClass;
+    var hasOpenClass = openContainer.hasClass(dropdownOpenClass);
+    var isOnlyOpen = uibDropdownService.isOnlyOpen($scope, appendTo);
 
     if (hasOpenClass === !isOpen) {
-      $animate[isOpen ? 'addClass' : 'removeClass'](openContainer, appendTo ? appendToOpenClass : openClass).then(function() {
+      var toggleClass;
+      if (appendTo) {
+        toggleClass = !isOnlyOpen ? 'addClass' : 'removeClass';
+      } else {
+        toggleClass = isOpen ? 'addClass' : 'removeClass';
+      }
+      $animate[toggleClass](openContainer, dropdownOpenClass).then(function() {
         if (angular.isDefined(isOpen) && isOpen !== wasOpen) {
           toggleInvoker($scope, { open: !!isOpen });
         }
@@ -3445,9 +3569,8 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
       }
 
       scope.focusToggleElement();
-      uibDropdownService.open(scope, $element);
+      uibDropdownService.open(scope, $element, appendTo);
     } else {
-      uibDropdownService.close(scope, $element);
       if (self.dropdownMenuTemplateUrl) {
         if (templateScope) {
           templateScope.$destroy();
@@ -3520,7 +3643,7 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
         }
       };
 
-      element.bind('click', toggleDropdown);
+      element.on('click', toggleDropdown);
 
       // WAI-ARIA
       element.attr({ 'aria-haspopup': true, 'aria-expanded': false });
@@ -3529,7 +3652,7 @@ angular.module('ui.bootstrap.dropdown', ['ui.bootstrap.position'])
       });
 
       scope.$on('$destroy', function() {
-        element.unbind('click', toggleDropdown);
+        element.off('click', toggleDropdown);
       });
     }
   };
@@ -3589,62 +3712,7 @@ angular.module('ui.bootstrap.stackedMap', [])
       }
     };
   });
-angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.position'])
-/**
- * A helper, internal data structure that stores all references attached to key
- */
-  .factory('$$multiMap', function() {
-    return {
-      createNew: function() {
-        var map = {};
-
-        return {
-          entries: function() {
-            return Object.keys(map).map(function(key) {
-              return {
-                key: key,
-                value: map[key]
-              };
-            });
-          },
-          get: function(key) {
-            return map[key];
-          },
-          hasKey: function(key) {
-            return !!map[key];
-          },
-          keys: function() {
-            return Object.keys(map);
-          },
-          put: function(key, value) {
-            if (!map[key]) {
-              map[key] = [];
-            }
-
-            map[key].push(value);
-          },
-          remove: function(key, value) {
-            var values = map[key];
-
-            if (!values) {
-              return;
-            }
-
-            var idx = values.indexOf(value);
-
-            if (idx !== -1) {
-              values.splice(idx, 1);
-            }
-
-            if (!values.length) {
-              delete map[key];
-            }
-          }
-        };
-      }
-    };
-  })
-
+angular.module('ui.bootstrap.modal', ['ui.bootstrap.multiMap', 'ui.bootstrap.stackedMap', 'ui.bootstrap.position'])
 /**
  * Pluggable resolve mechanism for the modal resolve resolution
  * Supports UI Router's $resolve service
@@ -4160,7 +4228,7 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.p
               ariaHiddenCount = parseInt(sibling.getAttribute(ARIA_HIDDEN_ATTRIBUTE_NAME), 10);
 
             if (!ariaHiddenCount) {
-              ariaHiddenCount = elemIsAlreadyHidden ? 1 : 0;  
+              ariaHiddenCount = elemIsAlreadyHidden ? 1 : 0;
             }
 
             sibling.setAttribute(ARIA_HIDDEN_ATTRIBUTE_NAME, ariaHiddenCount + 1);
@@ -4198,7 +4266,7 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.p
           }
         );
       }
-      
+
       $modalStack.close = function(modalInstance, result) {
         var modalWindow = openedWindows.get(modalInstance);
         unhideBackgroundElements();
@@ -4237,7 +4305,6 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.stackedMap', 'ui.bootstrap.p
 
       $modalStack.modalRendered = function(modalInstance) {
         var modalWindow = openedWindows.get(modalInstance);
-        $modalStack.focusFirstFocusableElement($modalStack.loadFocusElementList(modalWindow));
         if (modalWindow) {
           modalWindow.value.renderDeferred.resolve();
         }
@@ -6212,21 +6279,21 @@ angular.module('ui.bootstrap.timepicker', [])
       return e.detail || delta > 0;
     };
 
-    hoursInputEl.bind('mousewheel wheel', function(e) {
+    hoursInputEl.on('mousewheel wheel', function(e) {
       if (!disabled) {
         $scope.$apply(isScrollingUp(e) ? $scope.incrementHours() : $scope.decrementHours());
       }
       e.preventDefault();
     });
 
-    minutesInputEl.bind('mousewheel wheel', function(e) {
+    minutesInputEl.on('mousewheel wheel', function(e) {
       if (!disabled) {
         $scope.$apply(isScrollingUp(e) ? $scope.incrementMinutes() : $scope.decrementMinutes());
       }
       e.preventDefault();
     });
 
-     secondsInputEl.bind('mousewheel wheel', function(e) {
+     secondsInputEl.on('mousewheel wheel', function(e) {
       if (!disabled) {
         $scope.$apply(isScrollingUp(e) ? $scope.incrementSeconds() : $scope.decrementSeconds());
       }
@@ -6236,7 +6303,7 @@ angular.module('ui.bootstrap.timepicker', [])
 
   // Respond on up/down arrowkeys
   this.setupArrowkeyEvents = function(hoursInputEl, minutesInputEl, secondsInputEl) {
-    hoursInputEl.bind('keydown', function(e) {
+    hoursInputEl.on('keydown', function(e) {
       if (!disabled) {
         if (e.which === 38) { // up
           e.preventDefault();
@@ -6250,7 +6317,7 @@ angular.module('ui.bootstrap.timepicker', [])
       }
     });
 
-    minutesInputEl.bind('keydown', function(e) {
+    minutesInputEl.on('keydown', function(e) {
       if (!disabled) {
         if (e.which === 38) { // up
           e.preventDefault();
@@ -6264,7 +6331,7 @@ angular.module('ui.bootstrap.timepicker', [])
       }
     });
 
-    secondsInputEl.bind('keydown', function(e) {
+    secondsInputEl.on('keydown', function(e) {
       if (!disabled) {
         if (e.which === 38) { // up
           e.preventDefault();
@@ -6331,7 +6398,7 @@ angular.module('ui.bootstrap.timepicker', [])
       }
     };
 
-    hoursInputEl.bind('blur', function(e) {
+    hoursInputEl.on('blur', function(e) {
       ngModelCtrl.$setTouched();
       if (modelIsEmpty()) {
         makeValid();
@@ -6363,7 +6430,7 @@ angular.module('ui.bootstrap.timepicker', [])
       }
     };
 
-    minutesInputEl.bind('blur', function(e) {
+    minutesInputEl.on('blur', function(e) {
       ngModelCtrl.$setTouched();
       if (modelIsEmpty()) {
         makeValid();
@@ -6389,7 +6456,7 @@ angular.module('ui.bootstrap.timepicker', [])
       }
     };
 
-    secondsInputEl.bind('blur', function(e) {
+    secondsInputEl.on('blur', function(e) {
       if (modelIsEmpty()) {
         makeValid();
       } else if (!$scope.invalidSeconds && $scope.seconds < 10) {
@@ -7014,7 +7081,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
       }
     });
 
-    element.bind('focus', function (evt) {
+    element.on('focus', function (evt) {
       hasFocus = true;
       if (minLength === 0 && !modelCtrl.$viewValue) {
         $timeout(function() {
@@ -7023,7 +7090,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
       }
     });
 
-    element.bind('blur', function(evt) {
+    element.on('blur', function(evt) {
       if (isSelectOnBlur && scope.matches.length && scope.activeIdx !== -1 && !selected) {
         selected = true;
         scope.$apply(function() {
