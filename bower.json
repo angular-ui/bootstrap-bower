@@ -13,6 +13,7 @@
     "description": "Native AngularJS (Angular) directives for Bootstrap.",
     "version": "2.5.0",
     "main": ["./ui-bootstrap-tpls.js"],
+    "license": "MIT",
     "dependencies": {
         "angular": ">=1.4.0"
     }
