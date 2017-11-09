@@ -646,6 +646,11 @@ angular.module('ui.bootstrap.carousel', [])
     currentIndex = slide.index;
     setActive(index);
 
+    // every time you change the index, prefetch adjacent slides
+    $scope.$evalAsync(function () {
+      angular.extend(getSlideByIndex(self.getCurrentIndex()),{fetch: true});
+    });
+
     //every time you change slides, reset the timer
     restartTimer();
   }
