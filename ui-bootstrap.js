@@ -2,7 +2,7 @@
  * angular-ui-bootstrap
  * http://angular-ui.github.io/bootstrap/
 
- * Version: 2.5.4 - 2018-09-12
+ * Version: 2.5.4 - 2018-09-14
  * License: MIT
  */angular.module("ui.bootstrap", ["ui.bootstrap.collapse","ui.bootstrap.tabindex","ui.bootstrap.accordion","ui.bootstrap.alert","ui.bootstrap.buttons","ui.bootstrap.carousel","ui.bootstrap.dateparser","ui.bootstrap.isClass","ui.bootstrap.datepicker","ui.bootstrap.position","ui.bootstrap.datepickerPopup","ui.bootstrap.debounce","ui.bootstrap.multiMap","ui.bootstrap.dropdown","ui.bootstrap.stackedMap","ui.bootstrap.modal","ui.bootstrap.paging","ui.bootstrap.pager","ui.bootstrap.pagination","ui.bootstrap.tooltip","ui.bootstrap.popover","ui.bootstrap.progressbar","ui.bootstrap.rating","ui.bootstrap.tabs","ui.bootstrap.timepicker","ui.bootstrap.typeahead"]);
 angular.module('ui.bootstrap.collapse', [])
@@ -6738,8 +6738,8 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
     };
   }])
 
-  .controller('UibTypeaheadController', ['$scope', '$element', '$attrs', '$compile', '$parse', '$q', '$timeout', '$document', '$window', '$rootScope', '$$debounce', '$uibPosition', 'uibTypeaheadParser',
-    function(originalScope, element, attrs, $compile, $parse, $q, $timeout, $document, $window, $rootScope, $$debounce, $position, typeaheadParser) {
+  .controller('UibTypeaheadController', ['$scope', '$element', '$attrs', '$compile', '$parse', '$q', '$timeout', '$document', '$window', '$rootScope', '$$debounce', '$uibPosition', 'uibTypeaheadParser', '$scope', '$interpolate',
+    function(originalScope, element, attrs, $compile, $parse, $q, $timeout, $document, $window, $rootScope, $$debounce, $position, typeaheadParser, $scope, $interpolate) {
     var HOT_KEYS = [9, 13, 27, 38, 40];
     var eventDebounceTime = 200;
     var modelCtrl, ngModelOptions;
@@ -6814,7 +6814,9 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
     };
 
     //expressions used by typeahead
-    var parserResult = typeaheadParser.parse(attrs.uibTypeahead);
+      var getParserResult = function() {
+        return typeaheadParser.parse($interpolate(attrs.uibTypeahead)($scope));
+      };
 
     var hasFocus;
 
@@ -6933,7 +6935,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
       var locals = {$viewValue: inputValue};
       isLoadingSetter(originalScope, true);
       isNoResultsSetter(originalScope, false);
-      $q.when(parserResult.source(originalScope, locals)).then(function(matches) {
+        $q.when(getParserResult().source(originalScope, locals)).then(function(matches) {
         //it might happen that several async queries were in progress if a user were typing fast
         //but we are interested only in responses that correspond to the current view value
         var onCurrentRequest = inputValue === modelCtrl.$viewValue;
@@ -6945,10 +6947,10 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
 
             //transform labels
             for (var i = 0; i < matches.length; i++) {
-              locals[parserResult.itemName] = matches[i];
+                locals[getParserResult().itemName] = matches[i];
               scope.matches.push({
                 id: getMatchId(i),
-                label: parserResult.viewMapper(scope, locals),
+                  label: getParserResult().viewMapper(scope, locals),
                 model: matches[i]
               });
             }
@@ -7063,8 +7065,8 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
       var model, item;
 
       selected = true;
-      locals[parserResult.itemName] = item = scope.matches[activeIdx].model;
-      model = parserResult.modelMapper(originalScope, locals);
+        locals[getParserResult().itemName] = item = scope.matches[activeIdx].model;
+        model = getParserResult().modelMapper(originalScope, locals);
       $setModelValue(originalScope, model);
       modelCtrl.$setValidity('editable', true);
       modelCtrl.$setValidity('parse', true);
@@ -7072,7 +7074,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
       onSelectCallback(originalScope, {
         $item: item,
         $model: model,
-        $label: parserResult.viewMapper(originalScope, locals),
+        $label: getParserResult().viewMapper(originalScope, locals),
         $event: evt
       });
 
@@ -7275,10 +7277,10 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
 
         //it might happen that we don't have enough info to properly render input value
         //we need to check for this situation and simply return model value if we can't apply custom formatting
-        locals[parserResult.itemName] = modelValue;
-        candidateViewValue = parserResult.viewMapper(originalScope, locals);
-        locals[parserResult.itemName] = undefined;
-        emptyViewValue = parserResult.viewMapper(originalScope, locals);
+          locals[getParserResult().itemName] = modelValue;
+          candidateViewValue = getParserResult().viewMapper(originalScope, locals);
+          locals[getParserResult().itemName] = undefined;
+          emptyViewValue = getParserResult().viewMapper(originalScope, locals);
 
         return candidateViewValue !== emptyViewValue ? candidateViewValue : modelValue;
       });
